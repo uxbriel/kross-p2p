@@ -18,42 +18,47 @@ export default function YapeCodeHint() {
   return (
     <div className="rounded-2xl overflow-hidden mb-2"
       style={{ background: '#F7F1FD', border: '1px solid #E9DDF9' }}>
-      <svg viewBox="0 0 320 58" className="w-full block" role="img"
+      <svg viewBox="0 0 320 62" className="w-full block" role="img"
         aria-label="En tu pantalla de Yape, la fila Código de seguridad muestra tres números.">
-        {/* Bordes morados: los cantos de la tarjeta de Yape. Bastan para que se
-            reconozca la pantalla sin reproducirla entera. */}
-        <rect width="320" height="58" fill="#742384" />
-        <rect x="10" width="300" height="58" fill="#fff" />
+        {/* Cantos morados de la tarjeta de Yape: bastan para que se reconozca la
+            pantalla sin reproducirla entera. */}
+        <rect width="320" height="62" fill="#742384" />
+        <rect x="8" width="304" height="62" fill="#fff" />
         {/* Las hairlines que enmarcan la fila en la app real. */}
-        <rect x="22" y="6" width="276" height="1" fill="#EDEDF2" />
-        <rect x="22" y="51" width="276" height="1" fill="#EDEDF2" />
+        <rect x="24" y="7" width="272" height="1" fill="#EDEDF2" />
+        <rect x="24" y="54" width="272" height="1" fill="#EDEDF2" />
 
-        <text x="24" y="33" fontSize="11.5" fontWeight="700" letterSpacing="0.4"
+        {/* 10.5px con poco letter-spacing: a 11.5 el rótulo se comía el ícono.
+            El margen hasta el punto de info se deja holgado a propósito, porque
+            el ancho real depende de la fuente del sistema y no es calculable. */}
+        <text x="24" y="36" fontSize="10.5" fontWeight="700" letterSpacing="0.2"
           fill="#6B6B7B" fontFamily="system-ui, sans-serif">CÓDIGO DE SEGURIDAD</text>
         {/* El puntito de info del original: sin él la fila no se reconoce igual. */}
-        <circle cx="163" cy="29" r="7.5" fill="#3FC7A8" />
-        <text x="163" y="33" textAnchor="middle" fontSize="9" fontWeight="700"
+        <circle cx="168" cy="31" r="7" fill="#3FC7A8" />
+        <text x="168" y="34.5" textAnchor="middle" fontSize="8.5" fontWeight="700"
           fill="#fff" fontFamily="system-ui, sans-serif">i</text>
 
-        {/* Los 3 dígitos: lo único que el comprador tiene que copiar. Se marcan
-            con el color de marca —no con neón— porque esta es la pantalla del
-            cobro y la confianza pesa más que la llamada de atención. */}
+        {/* Los 3 dígitos: lo único que el comprador tiene que copiar. Alineados
+            a x=296 para dejar el mismo margen que el rótulo tiene a la
+            izquierda; antes quedaban pegados al borde. Se marcan con el morado
+            de Yape y no con neón porque esta es la pantalla del cobro, y ahí la
+            confianza pesa más que la llamada de atención. */}
         <g>
-          <rect x="228" y="15" width="24" height="28" rx="5" fill="#F1F1F5" />
-          <rect x="256" y="15" width="24" height="28" rx="5" fill="#F1F1F5" />
-          <rect x="284" y="15" width="24" height="28" rx="5" fill="#F1F1F5" />
-          <text x="240" y="35" textAnchor="middle" fontSize="16" fontWeight="700"
+          <rect x="216" y="17" width="24" height="28" rx="5" fill="#F1F1F5" />
+          <rect x="244" y="17" width="24" height="28" rx="5" fill="#F1F1F5" />
+          <rect x="272" y="17" width="24" height="28" rx="5" fill="#F1F1F5" />
+          <text x="228" y="37" textAnchor="middle" fontSize="15" fontWeight="700"
             fill="#2B2B36" fontFamily="system-ui, sans-serif">3</text>
-          <text x="268" y="35" textAnchor="middle" fontSize="16" fontWeight="700"
+          <text x="256" y="37" textAnchor="middle" fontSize="15" fontWeight="700"
             fill="#2B2B36" fontFamily="system-ui, sans-serif">2</text>
-          <text x="296" y="35" textAnchor="middle" fontSize="16" fontWeight="700"
+          <text x="284" y="37" textAnchor="middle" fontSize="15" fontWeight="700"
             fill="#2B2B36" fontFamily="system-ui, sans-serif">9</text>
-          <rect x="224" y="11" width="88" height="36" rx="9" fill="none"
+          <rect x="211" y="12" width="90" height="38" rx="9" fill="none"
             stroke="#742384" strokeWidth="2" />
         </g>
       </svg>
 
-      <p className="text-[11px] leading-snug text-gray-600 px-3 py-2">
+      <p className="text-[11px] leading-snug text-gray-600 px-3.5 py-2.5">
         Apenas terminas de yapear, esta fila aparece en tu pantalla.
         {' '}<strong className="text-gray-800">Copia esos 3 números aquí abajo</strong> —
         con eso reconocemos tu pago al toque.
