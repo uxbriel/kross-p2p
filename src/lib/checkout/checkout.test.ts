@@ -13,6 +13,7 @@ import { CoverageService, coveredCities } from './services/CoverageService'
 import { AgencyService, suggestFreeText } from './services/AgencyService'
 import { DistrictCoverageService, methodForCoverage } from './services/DistrictCoverageService'
 import type { CheckoutState } from './types'
+import { stagesFor, stageIndex, toStage } from '../order-stages'
 
 const run = (state: CheckoutState, ...actions: CheckoutAction[]): CheckoutState =>
   actions.reduce(checkoutReducer, state)
@@ -652,5 +653,37 @@ describe('último pedido', () => {
   it('un storage corrupto no rompe la landing', () => {
     localStorage.setItem('kross_last_order', '{no es json')
     expect(loadLastOrder()).toBeNull()
+  })
+})
+
+// ─── Etapas del pedido ───────────────────────────────────────────────────────
+// `validando` solo aplica a pedidos con adelanto: en Lima no hay nada que
+// validar y un punto que nunca se enciende se lee como "algo se atascó".
+describe('etapas del pedido', () => {
+  it('con adelanto incluye Validando entre Pedido y Confirmado', () => {
+    const keys = stagesFor(10).map(s => s.key)
+    expect(keys).toEqual(['nuevo', 'validando', 'confirmado', 'preparando', 'en_camino', 'entregado'])
+  })
+
+  it('sin adelanto (Lima) no muestra Validando', () => {
+    expect(stagesFor(0).map(s => s.key)).not.toContain('validando')
+    expect(stagesFor(null).map(s => s.key)[1]).toBe('confirmado')
+  })
+
+  it('una etapa que no aplica a este pedido no rompe la barra', () => {
+    // Un pedido de Lima marcado `validando` por un dato viejo: cae a 0, no a -1,
+    // que pintaría la barra de progreso al revés.
+    expect(stageIndex('validando', stagesFor(0))).toBe(0)
+  })
+
+  it('ubica la etapa actual dentro de la lista que le toca', () => {
+    expect(stageIndex('confirmado', stagesFor(10))).toBe(2)
+    expect(stageIndex('confirmado', stagesFor(0))).toBe(1)
+  })
+
+  it('una etapa desconocida de la BD cae a nuevo', () => {
+    expect(toStage('inventada')).toBe('nuevo')
+    expect(toStage(null)).toBe('nuevo')
+    expect(toStage('validando')).toBe('validando')
   })
 })

@@ -7,7 +7,7 @@ const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 const STAGE_LABEL: Record<string, string> = {
-  nuevo: '📋 Pedido creado', confirmado: '📞 Confirmado', preparando: '📦 Preparando',
+  nuevo: '📋 Pedido creado', validando: '🔎 Validando pago', confirmado: '📞 Confirmado', preparando: '📦 Preparando',
   en_camino: '🚚 En camino', entregado: '✅ Entregado',
 }
 

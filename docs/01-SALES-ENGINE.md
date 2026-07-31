@@ -583,3 +583,26 @@ que mira es el comprador. Da igual que la UI no los pinte: viajan en la
 respuesta y quedan a la vista de cualquiera que abra la pestaña de red. Es la
 misma fuga que ya se corrigió en los mensajes del chat, y por eso el filtro vive
 en el backend y no en el componente.
+## Etapa `validando` y confirmación automática
+
+Un pedido con adelanto quedaba en **"Pedido"** desde que el comprador pagaba
+hasta que alguien lo confirmaba: **pagó y su barra no se movía**. Sin señal de
+avance, su siguiente paso es escribir "¿llegó mi pago?" — justo el mensaje que
+este checkout existe para evitar.
+
+- **Con adelanto** el pedido nace en `validando`, entre `nuevo` y `confirmado`.
+- **Sin adelanto** (Lima, contraentrega puro) nace **`confirmado`**: no hay nada
+  que validar, y mostrarle un paso pendiente que nunca va a ocurrir se lee como
+  que algo se atascó.
+- **Un cruce confirmado mueve a `confirmado`, sin flag de por medio.** Estaba
+  detrás de `yape_autoconfirm` para medir primero cuánto acierta el cruce, pero
+  eso dejaba al comprador con el dinero cobrado y la barra quieta.
+
+**Las advertencias no frenan el avance.** Nombre distinto o código que no calza
+quedan en `payment_reason` y en el mensaje interno, para que Ventas las revise
+**antes de despachar** — que es el momento donde importan. Frenar la barra por
+una advertencia le traslada al comprador una duda que es nuestra.
+
+**El stepper se arma según el pedido** (`lib/order-stages.ts`, única definición
+del orden: estaba copiado en seis archivos). Ventas sí ve `validando` siempre,
+porque necesita distinguir un pedido que espera cruce de uno recién creado.

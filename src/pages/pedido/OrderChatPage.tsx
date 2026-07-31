@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { stagesFor, stageIndex } from '../../lib/order-stages'
 import { Send, Play, Pause, Mic, Phone, PhoneOff, Package, Truck, MicOff, ArrowLeft, ShoppingCart } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { getSession, sendMessage, markRead } from '../../lib/order-api'
@@ -17,17 +18,11 @@ const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 // ─── Tracker ─────────────────────────────────────────────────────────────────
-const STAGES = [
-  { key: 'nuevo',      label: 'Pedido',     emoji: '📋' },
-  { key: 'confirmado', label: 'Confirmado', emoji: '📞' },
-  { key: 'preparando', label: 'Preparando', emoji: '📦' },
-  { key: 'en_camino',  label: 'En camino',  emoji: '🚚' },
-  { key: 'entregado',  label: 'Entregado',  emoji: '✅' },
-]
-const STAGE_ORDER = ['nuevo','confirmado','preparando','en_camino','entregado']
-
-function OrderTracker({ stage }: { stage: string }) {
-  const currentIdx = Math.max(0, STAGE_ORDER.indexOf(stage))
+// Las etapas dependen del pedido: sin adelanto no existe "Validando". Ver
+// `lib/order-stages.ts`, que es la única definición del orden.
+function OrderTracker({ stage, advanceAmount }: { stage: string; advanceAmount?: number | string | null }) {
+  const STAGES = stagesFor(advanceAmount)
+  const currentIdx = stageIndex(stage, STAGES)
   const ACCENT = 'var(--brand)'
   const current = STAGES[currentIdx]
   const pct = STAGES.length > 1 ? (currentIdx / (STAGES.length - 1)) * 100 : 0
@@ -790,7 +785,7 @@ export default function OrderChatPage() {
       {/* ── Tracker ── */}
       {session.status !== 'cancelado' && (
       <div className="flex-shrink-0">
-        <OrderTracker stage={session.stage} />
+        <OrderTracker stage={session.stage} advanceAmount={session.advance_amount} />
       </div>
       )}
 

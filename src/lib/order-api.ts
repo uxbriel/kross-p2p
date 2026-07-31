@@ -1,3 +1,4 @@
+import type { OrderStage } from './order-stages'
 const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
@@ -12,7 +13,7 @@ export interface OrderSession {
   product_price: number | null
   pack_name: string | null
   status: 'active' | 'delivered' | 'rejected' | 'expired' | 'cancelado'
-  stage: 'nuevo' | 'confirmado' | 'preparando' | 'en_camino' | 'entregado'
+  stage: OrderStage
   expires_at: string | null
   seller_name: string | null
   seller_role: string | null

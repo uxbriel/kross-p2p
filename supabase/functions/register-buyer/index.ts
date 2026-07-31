@@ -261,7 +261,13 @@ Deno.serve(async (req) => {
       pack_name: body.pack_name ?? null,
       items: [{ product_id: body.product_id ?? null, nombre: body.product_name, precio: finalPrice, unit_price: finalPrice, qty: 1, pack_name: body.pack_name ?? null, image: firstImage }],
       status: 'active',
-      stage: 'nuevo',
+      // Con adelanto arranca en `validando`: el comprador acaba de pagar y su
+      // barra TIENE que moverse, o el siguiente paso que da es escribir
+      // "¿llegó mi pago?" —el mensaje que este checkout existe para evitar—.
+      // Sin adelanto (Lima, contraentrega puro) no hay nada que validar y el
+      // pedido nace confirmado: mostrarle un paso pendiente que nunca va a
+      // ocurrir se lee como que algo se atascó.
+      stage: advanceAmount > 0 ? 'validando' : 'confirmado',
       // Costuras del estado central — el checkout las deja escritas desde el día 1
       payment_method: ['YAPE_PLIN', 'CONTRAENTREGA', 'TARJETA'].includes(body.payment_method ?? '') ? body.payment_method : 'CONTRAENTREGA',
       closed_by: body.closed_by === 'AI_CLOSER' ? 'AI_CLOSER' : 'DIRECT_CHECKOUT',
@@ -338,13 +344,17 @@ Deno.serve(async (req) => {
 
     if (chosen) {
       const matchedAt = new Date().toISOString()
-      const { data: st } = await supabase
-        .from('stores').select('yape_autoconfirm').eq('id', body.store_id).maybeSingle()
       const patch: Record<string, unknown> = {
         payment_verification: 'MATCHED', payment_matched_at: matchedAt,
         payment_reason: reason, payment_event_id: chosen.id,
       }
-      if (st?.yape_autoconfirm === true) patch.stage = 'confirmado'
+      // Un cruce confirmado mueve el pedido, sin flag de por medio: para el
+      // comprador el pago YA ocurrió, y dejarlo en "validando" mientras el
+      // dinero está cobrado es la contradicción que genera el reclamo.
+      // Las advertencias (nombre distinto, código que no calza) NO frenan esto
+      // — quedan en `payment_reason` y en el mensaje interno para que Ventas las
+      // revise antes de despachar, que es el momento donde importan.
+      patch.stage = 'confirmado'
 
       await supabase.from('order_sessions').update(patch).eq('id', data.id)
       await supabase.from('payment_events')

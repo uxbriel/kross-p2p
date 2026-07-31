@@ -1,3 +1,5 @@
+import { toStage } from './order-stages'
+import type { OrderStage } from './order-stages'
 // ─── CONTRATO CENTRAL DEL CLIENTE (Core) ─────────────────────────────────────
 // Fuente única de verdad que los 3 módulos (Sales / Logistics / Loyalty) leen y
 // escriben. NO es una tabla: se ENSAMBLA en lectura desde `buyers` + `order_sessions`.
@@ -10,7 +12,9 @@ export type AgencyName = 'SHALOM' | 'OLVA' | 'OTRO'
 export type ClosedBy = 'AI_CLOSER' | 'DIRECT_CHECKOUT'
 
 // Etapas REALES del pedido (alineadas a order_sessions.stage)
-export type OrderStage = 'nuevo' | 'confirmado' | 'preparando' | 'en_camino' | 'entregado'
+// El tipo vive en `order-stages.ts` junto con el orden y las etiquetas: tenerlo
+// aquí duplicado ya provocó que una pantalla mostrara un orden y otra, otro.
+export type { OrderStage } from './order-stages'
 
 // El objeto que define el spec (docs). Es la vista unificada del cliente + su pedido.
 export interface MerchantCustomerSession {
@@ -73,7 +77,7 @@ export interface RawBuyer {
 // los módulos deben leer la sesión por aquí, no armando su propia forma.
 export function toCustomerSession(order: RawOrderSession, buyer?: RawBuyer | null): MerchantCustomerSession {
   const asStage = (s?: string | null): OrderStage =>
-    (['nuevo', 'confirmado', 'preparando', 'en_camino', 'entregado'].includes(s ?? '') ? s : 'nuevo') as OrderStage
+    toStage(s)
 
   return {
     customer: {

@@ -467,3 +467,18 @@ DROP INDEX IF EXISTS idx_payment_events_unmatched;
 CREATE INDEX IF NOT EXISTS idx_payment_events_unmatched
   ON payment_events(store_id, amount_pen, received_at DESC)
   WHERE matched_order_id IS NULL AND ignored_reason IS NULL;
+
+-- ─── 14. Etapa `validando` ───────────────────────────────────────────────────
+-- Un pedido con adelanto quedaba en "Pedido" desde que el comprador pagaba
+-- hasta que alguien lo confirmaba: pagó y su barra no se movía. Sin señal de
+-- avance, su siguiente paso es escribir "¿llegó mi pago?" — justo el mensaje
+-- que el checkout existe para evitar.
+--
+-- Va ENTRE `nuevo` y `confirmado`. Los pedidos sin adelanto no la usan: en Lima
+-- no hay nada que validar y el pedido nace confirmado.
+ALTER TABLE order_sessions DROP CONSTRAINT IF EXISTS order_sessions_stage_check;
+ALTER TABLE order_sessions ADD CONSTRAINT order_sessions_stage_check
+  CHECK (stage = ANY (ARRAY[
+    'nuevo'::text, 'validando'::text, 'confirmado'::text,
+    'preparando'::text, 'en_camino'::text, 'entregado'::text
+  ]));

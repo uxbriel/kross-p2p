@@ -105,9 +105,6 @@ Deno.serve(async (req) => {
     return json({ error: 'Unauthorized' }, 401)
   }
 
-  const { data: store } = await supabase
-    .from('stores').select('yape_autoconfirm').eq('id', storeId).maybeSingle()
-
   // ─── Parseo ────────────────────────────────────────────────────────────────
   const parsed = parseYapeNotification(raw)
   // Lo que la fuente ya sepa completa lo que el parser no pudo. Nunca lo pisa:
@@ -204,7 +201,6 @@ Deno.serve(async (req) => {
   }
 
   const matchedAt = new Date().toISOString()
-  const autoconfirm = store?.yape_autoconfirm === true
 
   // El pedido lo mueve el BACKEND, nunca el front. Se marca MATCHED aunque
   // `reason` traiga una advertencia: el adelanto cuadró, el aviso es contexto
@@ -215,9 +211,13 @@ Deno.serve(async (req) => {
     payment_reason: reason,
     payment_event_id: event.id,
   }
-  // Pasar solo a `confirmado` es decisión de la marca. Arranca apagado: primero
-  // se mide cuánto acierta el cruce, después se le da el gatillo.
-  if (autoconfirm) patch.stage = 'confirmado'
+  // Un cruce confirmado mueve el pedido a `confirmado`, sin flag de por medio.
+  // Estaba detrás de `yape_autoconfirm` para medir primero cuánto acierta el
+  // cruce, pero eso dejaba al comprador con el dinero cobrado y la barra
+  // quieta en "validando" — la contradicción que genera el reclamo.
+  // Las advertencias NO frenan el avance: viven en `payment_reason` y en el
+  // mensaje interno, para que Ventas las revise antes de despachar.
+  patch.stage = 'confirmado'
 
   await supabase.from('order_sessions').update(patch).eq('id', chosen.id)
   await supabase.from('payment_events')
@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
       + (senderName ? ` · pagó ${senderName}` : '')
       + (securityCode ? ` · código ${securityCode}` : '')
       + (reason ? `\n⚠️ ${reason}` : '')
-      + (autoconfirm ? '' : '\nConfirma el pedido cuando lo revises.'),
+      + (reason ? '\nRevísalo antes de despachar.' : ''),
   })
 
   // Para el comprador: el acuse que estaba esperando, sin una sola palabra de
@@ -260,6 +260,6 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true, event_id: event.id, matched: true,
-    order_id: chosen.order_id, autoconfirmed: autoconfirm, reason,
+    order_id: chosen.order_id, reason,
   })
 })

@@ -10,6 +10,7 @@ const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 const STAGE_LABEL: Record<string, string> = {
   nuevo:      '📋 Pedido creado',
+  validando: '🔎 Validando pago',
   confirmado: '📞 Confirmado',
   preparando: '📦 Preparando',
   en_camino:  '🚚 En camino',
@@ -19,6 +20,7 @@ const STAGE_LABEL: Record<string, string> = {
 
 const STAGE_COLOR: Record<string, string> = {
   nuevo:      '#FFD400',
+  validando: '#F59E0B',
   confirmado: '#55C8F5',
   preparando: '#863bff',
   en_camino:  '#FF8C00',

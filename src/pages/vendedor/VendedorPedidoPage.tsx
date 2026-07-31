@@ -15,7 +15,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-const STAGES = ['nuevo','confirmado','preparando','en_camino','entregado']
+// Ventas SÍ ve `validando` siempre: necesita distinguir un pedido que espera
+// cruce de uno recién creado, aunque el comprador de Lima nunca pase por ahí.
+const STAGES = ['nuevo','validando','confirmado','preparando','en_camino','entregado']
 
 // ─── Seller-initiated call modal ──────────────────────────────────────────────
 type CallState = 'connecting' | 'connected' | 'ended' | 'error'
@@ -224,7 +226,7 @@ function StageSelector({ current, sessionId, canWrite, onAdvanced }: {
 }) {
   const [busy, setBusy] = useState(false)
   const stageLabel: Record<string, string> = {
-    nuevo: 'Nuevo', confirmado: 'Confirmado', preparando: 'Preparando', en_camino: 'En camino', entregado: 'Entregado'
+    nuevo: 'Nuevo', validando: 'Validando', confirmado: 'Confirmado', preparando: 'Preparando', en_camino: 'En camino', entregado: 'Entregado'
   }
 
   const advance = async () => {
