@@ -658,3 +658,29 @@ El panel del adelanto decía "sin comprobante adjunto" y ahí se acababa la ayud
 muestra **los 3 dígitos que tecleó el comprador**: es lo único accionable cuando el cruce
 automático no llega, porque con eso se busca el pago en la app de Yape sin depender de
 nadie.
+
+## El primer mensaje del chat dice el estado del pago ✅
+
+El comprador acaba de yapear y tiene **una sola duda**: si su plata llegó. El
+mensaje de bienvenida no la respondía, así que la única salida que le quedaba
+era escribirle al vendedor por WhatsApp — justo lo que este chat existe para
+evitar.
+
+Ahora el saludo cierra con:
+
+> ⏳ Estamos validando tu adelanto de S/10. Te aviso por aquí apenas cuadre.
+
+**Siempre "estamos validando", nunca "ya está confirmado".** El cruce corre más
+abajo en la misma función, así que a esa altura todavía no se sabe. Y no es un
+consuelo: cuando cuadra, el propio cruce manda su *"✅ ¡Recibimos tu adelanto!"*
+segundos después, y el comprador **ve el sistema trabajando en vivo** en lugar de
+leer un estado ya resuelto.
+
+Si no cruza, ese mensaje se queda como la única versión de los hechos — y dice
+que lo estamos validando **nosotros**. Nunca que su pago no existe: en la mayoría
+de esos casos el fallo es del lector, no suyo.
+
+También se agregó *"escríbeme por aquí cualquier duda"* al mensaje de
+**provincia**, que no lo tenía. Estaba solo en Lima, y era en provincia —donde el
+comprador ya adelantó plata y espera días— donde más falta hacía decirle cuál es
+el canal.

@@ -294,9 +294,32 @@ Deno.serve(async (req) => {
 
   const firstName = body.buyer_name ? ' ' + body.buyer_name.split(' ')[0] : ''
   const priceLine = `S/${finalPrice}${discount > 0 ? ` · usaste puntos: −S/${discount}` : ''}`
+  // El estado del adelanto va en el PRIMER mensaje. El comprador acaba de
+  // yapear y esa es su única duda: si su plata llegó. Callarlo lo empuja al
+  // WhatsApp del vendedor a preguntar, que es justo lo que este chat evita.
+  //
+  // Siempre dice "estamos validando", nunca "ya está confirmado": el cruce
+  // corre MÁS ABAJO en esta misma función, así que a esta altura todavía no se
+  // sabe. Y no es un consuelo — cuando cuadra, el propio cruce manda su "✅
+  // ¡Recibimos tu adelanto!" segundos después, y el comprador ve el sistema
+  // trabajando en vivo en vez de leer un estado ya resuelto.
+  //
+  // Regla dura del módulo: **nunca se le dice que su pago no existe.** Si no
+  // cruza, este mensaje se queda como la única versión de los hechos, y dice
+  // que lo estamos validando nosotros — porque en la mayoría de esos casos el
+  // fallo es del lector, no suyo.
+  const advanceLine = advanceAmount > 0
+    ? `\n\n⏳ Estamos validando tu adelanto de S/${advanceAmount}. Te aviso por aquí apenas cuadre.`
+    : ''
+
+  // "Pregúntame por aquí" estaba solo en el mensaje de Lima. Justo en provincia
+  // —donde el comprador ya adelantó plata y espera días— era donde más falta
+  // hacía decirle que este es el canal.
+  const askLine = '\n\nEscríbeme por aquí cualquier duda y te ayudo al toque. 😊'
+
   const welcomeBody = dispatchType === 'AGENCIA_PROVINCIA'
-    ? `¡Hola${firstName}! 🎉 Tu ${body.product_name} (${priceLine}) se enviará por agencia${agencyName ? ' ' + agencyName : ''}. Coordinamos el envío por aquí y el saldo lo pagas al recoger. 😊`
-    : `¡Hola${firstName}! 🎉 Tu ${body.product_name} (${priceLine}) llegará a tu puerta sin adelanto.\n\nEscríbeme por aquí cualquier duda y te ayudo al toque. 😊`
+    ? `¡Hola${firstName}! 🎉 Gracias por tu compra. Tu ${body.product_name} (${priceLine}) se enviará por agencia${agencyName ? ' ' + agencyName : ''} y el saldo lo pagas al recoger.${advanceLine}${askLine}`
+    : `¡Hola${firstName}! 🎉 Gracias por tu compra. Tu ${body.product_name} (${priceLine}) llegará a tu puerta sin adelanto.${askLine}`
 
   await supabase.from('chat_messages').insert({
     session_id: data.id,
