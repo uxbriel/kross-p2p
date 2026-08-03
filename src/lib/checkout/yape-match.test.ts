@@ -132,3 +132,48 @@ describe('código tecleado que no coincide', () => {
     expect(d.reason).toBeNull()
   })
 })
+
+// ─── Pagó de menos ───────────────────────────────────────────────────────────
+// Caso REAL (31-jul-2026): el comprador tecleó 195, su pedido esperaba S/10 y
+// yapeó S/0.50 con ese mismo código. El algoritmo filtraba por monto ANTES de
+// mirar el código, así que pago y pedido quedaban huérfanos y nadie sabía que
+// iban juntos. El código es la evidencia más fuerte que existe —se teclea ANTES
+// de pagar— y ahora manda sobre el monto.
+describe('el código manda sobre el monto', () => {
+  it('identifica el pedido aunque el monto no alcance', () => {
+    const d = matchPaymentToOrders(
+      payment({ amount_pen: 0.5, security_code: '195' }),
+      [order({ advance_amount: 10, advance_yape_code: '195' })],
+    )
+    expect(d.chosen?.id).toBe('o1')
+    expect(d.shortPaid).toBe(true)
+    expect(d.reason).toMatch(/0\.5.*10.*[Ff]alta cobrar/)
+  })
+
+  it('con el monto completo NO marca falta de pago', () => {
+    const d = matchPaymentToOrders(
+      payment({ amount_pen: 10, security_code: '195' }),
+      [order({ advance_amount: 10, advance_yape_code: '195' })],
+    )
+    expect(d.shortPaid).toBeUndefined()
+  })
+
+  it('avisa igual en el sentido inverso', () => {
+    const d = matchOrderToPayments(
+      order({ advance_amount: 10, advance_yape_code: '195' }),
+      [payment({ amount_pen: 0.5, security_code: '195' })],
+    )
+    expect(d.chosen?.id).toBe('p1')
+    expect(d.shortPaid).toBe(true)
+  })
+
+  it('sin código no inventa cruces entre montos distintos', () => {
+    // Aquí NO hay evidencia de que vayan juntos: sin código, un monto distinto
+    // es simplemente otro pago. Enlazarlos sería adivinar.
+    const d = matchPaymentToOrders(
+      payment({ amount_pen: 0.5, security_code: null }),
+      [order({ advance_amount: 10, advance_yape_code: '195' })],
+    )
+    expect(d.chosen).toBeNull()
+  })
+})

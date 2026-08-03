@@ -116,11 +116,17 @@ export default function Step1Pack({ packs, unitPrice, selected, onSelect, bestPa
         })}
       </div>
 
-      {/* Señales de confianza: lo que quita el miedo a comprar por un anuncio. */}
-      <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-gray-500">
-        <li>✅ En Lima pagas al recibir</li>
-        <li>🚚 Envíos a todo el Perú</li>
-        <li>🔒 Tus datos no se comparten</li>
+      {/* Señales de confianza: lo que quita el miedo a comprar por un anuncio.
+          Van en UNA sola línea: en dos ocupaban el doble de alto empujando el
+          CTA fuera de pantalla en equipos chicos, y tres frases apiladas se
+          leen como letra chica legal en vez de como tranquilidad.
+          `whitespace-nowrap` en cada ítem impide que una frase se parta a la
+          mitad; el texto se encoge en pantallas angostas antes que romperse. */}
+      <ul className="mt-4 flex items-center justify-between gap-2
+        text-[10px] min-[380px]:text-[11px] text-gray-500">
+        <li className="whitespace-nowrap">✅ Pagas al recibir</li>
+        <li className="whitespace-nowrap">🚚 Todo el Perú</li>
+        <li className="whitespace-nowrap">🔒 Datos seguros</li>
       </ul>
     </>
   )

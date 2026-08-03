@@ -14,6 +14,7 @@ import { trackEvent } from '../../lib/checkout/analytics'
 import type { CheckoutState } from '../../lib/checkout/types'
 import { effectivePrice } from '../../lib/checkout/product-packs'
 import { submitOrder, uploadVoucher } from '../../lib/checkout/services/OrderService'
+import { saveLastOrder } from '../../lib/checkout/persistence'
 import type { SubmitContext } from '../../lib/checkout/services/OrderService'
 import Step1Pack from './steps/Step1Pack'
 import type { PackOption } from './steps/Step1Pack'
@@ -145,6 +146,8 @@ export default function CheckoutModal({
       })
       setOrderCode(res.order_id)
       setOrderToken(res.token)
+      // Sobrevive al cierre del modal: la landing ofrece volver al pedido.
+      saveLastOrder(res.token, res.order_id, submitContext.productId ?? null)
       dispatch({ type: 'SUBMITTED' })
       trackEvent({ name: 'order_submitted', orderId: state.orderId })
       // El borrador deja de existir: un pedido enviado no se reabre.

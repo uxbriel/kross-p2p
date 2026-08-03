@@ -187,3 +187,18 @@ Ahora `get-session` devuelve `dispatch_type` / `agency_name` y `AddressBar`:
 **Regla general:** todo lo que el checkout decide sobre la entrega tiene que
 viajar al chat. Si el chat no conoce `dispatch_type`, vuelve a inventar
 pendientes que el checkout ya había resuelto.
+
+## Antes de despachar: el adelanto
+
+Un pedido de provincia no se despacha por estar "confirmado": se despacha cuando el
+adelanto está verificado **y sin advertencias pendientes**.
+
+- `advance.verification = 'MATCHED'` y `reason` vacío → listo.
+- `MATCHED` **con** `reason` (nombre distinto, código que no calza) → lo mira una persona.
+  El pedido avanza igual en la barra del comprador —el pago entró, la duda es nuestra—
+  pero el `AdvancePanel` del chat de Ventas muestra la advertencia y el comprobante.
+- `PENDING` → el pago no ha cruzado. No se despacha.
+
+El comprobante se abre desde ese panel con URL firmada de 5 minutos (`voucher-url`).
+Nunca se sirve como enlace directo: lleva nombre, teléfono parcial y número de operación
+del comprador. Contrato y reglas completas en `00-CORE-ARCHITECTURE.md`.

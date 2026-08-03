@@ -13,6 +13,7 @@ import { COPY, YAPE_CODE_LENGTH } from '../../../lib/checkout/checkout.config'
 import type { CheckoutState } from '../../../lib/checkout/types'
 import type { FieldErrors } from '../../../lib/checkout/validation'
 import type { StoreYape } from '../CheckoutModal'
+import YapeCodeHint from '../YapeCodeHint'
 import YapeBox from '../payment/YapeBox'
 import VoucherField from '../payment/VoucherField'
 import Field from '../fields/Field'
@@ -80,6 +81,10 @@ export default function Step3Confirm({
           <YapeBox yape={yape} amount={advance} />
 
           <div className="mt-3">
+            {/* La ayuda va ARRIBA del campo: quien ya sabe la ignora en medio
+                segundo, y quien no, la ve antes de quedarse mirando un input
+                vacío sin saber qué escribir. */}
+            <YapeCodeHint />
             <Field
               label={COPY.yapeCodeLabel}
               required

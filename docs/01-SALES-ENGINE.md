@@ -468,3 +468,193 @@ Yape, encontrar la galería y volver. Además **no hace falta para cobrar** — 
 cruce funciona solo con el código. La captura sirve cuando el cruce falla, y ahí
 el problema suele ser nuestro (el lector caído), no del comprador: cobrarle a él
 con fricción el seguro de nuestra falla está al revés.
+
+## El checkout multi-paso es el default
+
+Desde este cambio, la landing abre el checkout de 3 pasos. El viejo (`CheckoutQuiz`)
+queda detrás de `?checkout=v1` **solo como escotilla**: si algo sale mal en
+producción se vuelve al anterior cambiando la URL, sin esperar un deploy. No es un
+experimento, es el botón de emergencia.
+
+El motivo del cambio no es que el nuevo sea más bonito: el viejo **solo pedía
+datos**. No tenía forma de llevar al comprador al chat del pedido, y de ahí sale la
+tasa de entrega — el número que decide si un COD gana o pierde plata. Un checkout
+que cierra la venta pero deja al cliente sin saber por dónde le van a escribir
+optimiza la mitad del problema.
+
+**Queda pendiente medirlo.** El cambio se hizo por criterio de producto, no con
+datos comparados: si a las semanas la conversión cae, la escotilla está ahí. Borrar
+`CheckoutQuiz` recién tiene sentido cuando haya números que respalden el cambio.
+
+## La fricción del código de seguridad
+
+En la primera venta real a un tercero hubo que **explicarle por chat qué es el
+código de seguridad de Yape**. Una explicación que hay que dar por chat no
+escala: el próximo comprador no tiene a quién preguntarle.
+
+Era el único punto del checkout donde el comprador tenía que aprender algo
+nuevo. La respuesta no fue más texto —ya había un hint y no alcanzó— sino
+**reconocimiento**: una miniatura de la pantalla de "¡Yapeaste!" con los 3
+dígitos resaltados. Casi todo peruano ya vio esa pantalla; no hay nada que leer,
+se compara y listo. El rótulo del campo también dejó de usar el término técnico
+("Código de seguridad de tu Yape" → "Los 3 números que te dio Yape").
+
+### Por qué el código NO puede volverse opcional
+
+`ADVANCE_PROVINCIA_PEN = 10` y Olva `= 20`: **todos** los pedidos de Shalom
+piden exactamente S/10 y todos los de Olva S/20. El monto no distingue nada en
+cuanto hay más de un pedido esperando — el código es lo único que decide. Hoy
+funciona sin él por volumen bajo, no por diseño; a volumen, sin código todo
+caería a revisión humana.
+
+### La alternativa de fondo (sin implementar)
+
+Reemplazar el código por **céntimos únicos por pedido**: pedir S/10.07 en vez de
+S/10, donde los céntimos son el discriminador. Elimina el campo y el concepto —
+el comprador solo copia un monto, que ya tiene que escribir de todas formas.
+Riesgo: que redondee a S/10 por costumbre, lo que degrada a revisión humana. Es
+un cambio de instrucción de cobro, así que es decisión de negocio.
+
+## El canal es el chat, no WhatsApp
+
+La pantalla final prometía "Te escribimos por WhatsApp". **No es así**: WhatsApp
+es el *fallback* para cuando el comprador no entra al chat del pedido.
+Prometerlo mandaba a esperar por donde no escribimos primero, y de paso dejaba
+el chat —que es lo que sostiene la tasa de entrega— sonando a algo secundario.
+
+## "Ver mi pedido" en la landing
+
+Al tocar "Listo" y cerrarse la ventana de confirmación, el comprador se quedaba
+en la landing **sin ninguna vía de volver a su pedido**: el token vivía solo en
+memoria del modal. Feedback de compradores reales.
+
+Ahora el token se guarda en `localStorage` (`saveLastOrder`) y la barra inferior
+ofrece **"Ver mi pedido"** junto a "¡Lo quiero!", en estilo secundario: la
+landing sigue siendo para vender, no para dar seguimiento. Caduca a los 3 días
+—después la entrega ya ocurrió y un botón viejo solo confunde— y un storage
+corrupto o el modo incógnito no rompen nada.
+
+## No hay botón de "Abrir Yape"
+
+Hubo uno, con `yape://`, y estaba **muerto en producción**: era un esquema
+supuesto que nunca se verificó contra la app real. No se reintenta con
+`intent://` por tres razones:
+
+1. **Chrome Android** no abre esquemas custom desde un `<a href>` normal; exige
+   `intent://` con nombre de paquete, que habría que confirmar en un equipo.
+2. **iOS**: si la app no declaró el esquema, Safari muestra su pantalla de error
+   — un callejón sin salida *justo en el paso del cobro*, y no hay forma
+   confiable de detectar el fallo antes de intentarlo.
+3. **Aunque abriera**, cae en la pantalla de inicio de Yape: **no puede
+   pre-llenar número ni monto**, porque eso requiere el deep link de pago
+   comercial (Yape Empresas), no un esquema público.
+
+O sea: ahorraba un cambio de app a cambio de arriesgar la venta. **Copiar el
+número funciona siempre, en los dos sistemas**, y ahora es la acción única y a
+todo el ancho — una acción confiable vale más que dos donde una falla.
+
+Si algún día Kross accede al deep link de pago oficial, ahí sí vale la pena: ese
+sí llega con monto y destinatario puestos, que es el único caso donde el botón
+justifica su riesgo.
+## Visor de comprobantes
+
+El bucket `vouchers` es privado y sin política de lectura, a propósito: una
+captura de Yape lleva nombre, teléfono parcial y número de operación. Pero eso
+dejaba al equipo **viendo la advertencia del cruce sin poder resolverla** — "el
+nombre no coincide" no sirve de nada si no puedes abrir la captura.
+
+La función `voucher-url` es la única puerta:
+
+- comprueba que quien pide sea vendedor **de la tienda dueña del pedido** (sin
+  ese cruce, cualquier vendedor de cualquier marca leería los comprobantes de
+  las demás con solo tener el id de un pedido);
+- devuelve una URL firmada de **5 minutos**, que no se guarda ni se precarga —
+  se pide solo cuando alguien decide mirarla;
+- si no hay comprobante responde `200` con `url: null`, no un error: la mayoría
+  de pedidos cuadra por código y nunca sube captura.
+
+`AdvancePanel` lo muestra en el chat del vendedor, arriba de la dirección
+—porque si el adelanto no cuadró, eso decide si se despacha— junto al estado del
+cruce y su motivo literal.
+
+**`get-session` filtra por rol.** `payment_reason` (el veredicto interno) y
+`advance_voucher_url` (la ruta privada) se eliminan de la respuesta cuando el
+que mira es el comprador. Da igual que la UI no los pinte: viajan en la
+respuesta y quedan a la vista de cualquiera que abra la pestaña de red. Es la
+misma fuga que ya se corrigió en los mensajes del chat, y por eso el filtro vive
+en el backend y no en el componente.
+## Etapa `validando` y confirmación automática
+
+Un pedido con adelanto quedaba en **"Pedido"** desde que el comprador pagaba
+hasta que alguien lo confirmaba: **pagó y su barra no se movía**. Sin señal de
+avance, su siguiente paso es escribir "¿llegó mi pago?" — justo el mensaje que
+este checkout existe para evitar.
+
+- **Con adelanto** el pedido nace en `validando`, entre `nuevo` y `confirmado`.
+- **Sin adelanto** (Lima, contraentrega puro) nace **`confirmado`**: no hay nada
+  que validar, y mostrarle un paso pendiente que nunca va a ocurrir se lee como
+  que algo se atascó.
+- **Un cruce confirmado mueve a `confirmado`, sin flag de por medio.** Estaba
+  detrás de `yape_autoconfirm` para medir primero cuánto acierta el cruce, pero
+  eso dejaba al comprador con el dinero cobrado y la barra quieta.
+
+**Las advertencias no frenan el avance.** Nombre distinto o código que no calza
+quedan en `payment_reason` y en el mensaje interno, para que Ventas las revise
+**antes de despachar** — que es el momento donde importan. Frenar la barra por
+una advertencia le traslada al comprador una duda que es nuestra.
+
+**El stepper se arma según el pedido** (`lib/order-stages.ts`, única definición
+del orden: estaba copiado en seis archivos). Ventas sí ve `validando` siempre,
+porque necesita distinguir un pedido que espera cruce de uno recién creado.
+
+## Respuestas rápidas en el chat
+
+Fichas tocables encima del campo de texto, al estilo de las plantillas de
+WhatsApp. Hacen dos cosas a la vez: **bajan el costo de la primera
+interacción** —escribirle de cero a un desconocido cuesta más que tocar un
+botón— y **le enseñan que este chat es donde se resuelve su pedido**, que es lo
+que sostiene la tasa de entrega.
+
+**Se derivan del estado, no se guardan en la base.** Guardadas por mensaje
+quedarían obsoletas: "¿Ya llegó mi pago?" seguiría ofreciéndose una semana
+después de que el pago cuadró. Así la ficha siempre corresponde a lo que le pasa
+al pedido ahora.
+
+**Desaparecen en cuanto el comprador escribe.** Ya cumplieron su trabajo, y
+dejarlas para siempre convierte la ayuda en estorbo sobre el teclado.
+
+En `validando` la segunda ficha es **"Te envío mi comprobante"**: así la captura
+se pide **solo a quien puede hacer falta**, en el momento en que importa, en vez
+de pedírsela a todos por si acaso en el checkout.
+
+## El código manda sobre el monto
+
+Caso real (31-jul-2026): un comprador tecleó **195**, su pedido esperaba **S/10**, y
+yapeó **S/0.50** con ese mismo código. El algoritmo filtraba por monto **antes** de mirar
+el código, así que pago y pedido quedaron **huérfanos** — nadie podía saber que iban
+juntos, ni siquiera mirándolos uno al lado del otro.
+
+El código de seguridad es la evidencia más fuerte que existe: **el comprador lo teclea
+ANTES de pagar**, así que no puede fabricarse a posteriori. Filtrar por monto primero la
+desperdiciaba. Ahora el código se busca en **todos** los pedidos pendientes.
+
+**Identificar no es cobrar.** Cuando el código calza pero el monto no:
+
+- el pago **se enlaza** al pedido, para que Ventas los vea juntos en vez de tener dos
+  huérfanos;
+- `payment_verification` queda en **`PENDING`** y el pedido **no** pasa a `confirmado`:
+  falta plata, y despachar sin cobrarla es regalar mercadería;
+- el mensaje interno dice *"Pagó S/0.50 de los S/10 esperados. Falta cobrar la
+  diferencia"*;
+- **al comprador NO se le manda el acuse.** Decirle "recibimos tu adelanto" cuando pagó
+  de menos lo deja creyendo que ya está, y el problema aparece recién en la puerta.
+
+**Sin código no se cruzan montos distintos.** Ahí no hay evidencia de que vayan juntos:
+un monto distinto es simplemente otro pago, y enlazarlos sería adivinar.
+
+### Y el código se le muestra a Ventas
+
+El panel del adelanto decía "sin comprobante adjunto" y ahí se acababa la ayuda. Ahora
+muestra **los 3 dígitos que tecleó el comprador**: es lo único accionable cuando el cruce
+automático no llega, porque con eso se busca el pago en la app de Yape sin depender de
+nadie.

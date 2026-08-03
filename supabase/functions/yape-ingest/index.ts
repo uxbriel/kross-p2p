@@ -105,9 +105,6 @@ Deno.serve(async (req) => {
     return json({ error: 'Unauthorized' }, 401)
   }
 
-  const { data: store } = await supabase
-    .from('stores').select('yape_autoconfirm').eq('id', storeId).maybeSingle()
-
   // ─── Parseo ────────────────────────────────────────────────────────────────
   const parsed = parseYapeNotification(raw)
   // Lo que la fuente ya sepa completa lo que el parser no pudo. Nunca lo pisa:
@@ -192,7 +189,7 @@ Deno.serve(async (req) => {
 
   // La regla de cruce vive en `_shared/yape-match.ts`: la comparten esta
   // función y `register-buyer`, para que las dos direcciones decidan igual.
-  const { chosen, reason } = matchPaymentToOrders(
+  const { chosen, reason, shortPaid } = matchPaymentToOrders(
     { id: event.id, amount_pen: amountPen, sender_name: senderName, security_code: securityCode },
     candidates ?? [],
   )
@@ -204,20 +201,26 @@ Deno.serve(async (req) => {
   }
 
   const matchedAt = new Date().toISOString()
-  const autoconfirm = store?.yape_autoconfirm === true
 
   // El pedido lo mueve el BACKEND, nunca el front. Se marca MATCHED aunque
   // `reason` traiga una advertencia: el adelanto cuadró, el aviso es contexto
   // para quien revisa.
+  // Con el monto incompleto el pago SÍ se enlaza —para que Ventas lo vea junto
+  // al pedido en vez de dejar dos huérfanos— pero NO se da por verificado:
+  // falta plata, y despachar sin cobrarla es regalar mercadería.
   const patch: Record<string, unknown> = {
-    payment_verification: 'MATCHED',
+    payment_verification: shortPaid ? 'PENDING' : 'MATCHED',
     payment_matched_at: matchedAt,
     payment_reason: reason,
     payment_event_id: event.id,
   }
-  // Pasar solo a `confirmado` es decisión de la marca. Arranca apagado: primero
-  // se mide cuánto acierta el cruce, después se le da el gatillo.
-  if (autoconfirm) patch.stage = 'confirmado'
+  // Un cruce confirmado mueve el pedido a `confirmado`, sin flag de por medio.
+  // Estaba detrás de `yape_autoconfirm` para medir primero cuánto acierta el
+  // cruce, pero eso dejaba al comprador con el dinero cobrado y la barra
+  // quieta en "validando" — la contradicción que genera el reclamo.
+  // Las advertencias NO frenan el avance: viven en `payment_reason` y en el
+  // mensaje interno, para que Ventas las revise antes de despachar.
+  if (!shortPaid) patch.stage = 'confirmado'
 
   await supabase.from('order_sessions').update(patch).eq('id', chosen.id)
   await supabase.from('payment_events')
@@ -241,25 +244,30 @@ Deno.serve(async (req) => {
       + (senderName ? ` · pagó ${senderName}` : '')
       + (securityCode ? ` · código ${securityCode}` : '')
       + (reason ? `\n⚠️ ${reason}` : '')
-      + (autoconfirm ? '' : '\nConfirma el pedido cuando lo revises.'),
+      + (reason ? '\nRevísalo antes de despachar.' : ''),
   })
 
   // Para el comprador: el acuse que estaba esperando, sin una sola palabra de
   // nuestra cocina. Es además el PRIMER mensaje que recibe de la marca, así que
   // hace doble trabajo: confirma su plata y le enseña que este chat es el canal
   // por donde va a saber de su pedido.
-  await supabase.from('chat_messages').insert({
-    session_id: chosen.id,
-    sender_role: 'system',
-    sender_name: 'Kross',
-    type: 'status_update',
-    visibility: 'all',
-    body: `✅ ¡Recibimos tu adelanto de S/${amountPen}! Ya estamos preparando tu pedido.`
-      + ' Por aquí te avisamos cuando salga.',
-  })
+  // El acuse al comprador SOLO si el adelanto entró completo. Decirle "recibimos
+  // tu adelanto" cuando pagó de menos lo deja creyendo que ya está, y el
+  // problema aparece recién en la puerta.
+  if (!shortPaid) {
+    await supabase.from('chat_messages').insert({
+      session_id: chosen.id,
+      sender_role: 'system',
+      sender_name: 'Kross',
+      type: 'status_update',
+      visibility: 'all',
+      body: `✅ ¡Recibimos tu adelanto de S/${amountPen}! Ya estamos preparando tu pedido.`
+        + ' Por aquí te avisamos cuando salga.',
+    })
+  }
 
   return json({
     ok: true, event_id: event.id, matched: true,
-    order_id: chosen.order_id, autoconfirmed: autoconfirm, reason,
+    order_id: chosen.order_id, reason,
   })
 })

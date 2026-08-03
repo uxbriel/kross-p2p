@@ -3,12 +3,24 @@
 // Kross es multi-tenant y cada marca cobra al suyo.
 //
 // Paridad móvil/desktop, que aquí no es un lujo: el flujo se graba en tutoriales
-// desde una laptop. En móvil hay deep link a la app; en desktop no existe, así
-// que manda el QR y el número copiable. Ninguna pantalla dice "ábrelo en tu
-// celular" — eso sería un callejón sin salida para quien compra desde la PC.
+// desde una laptop. Manda el número copiable, y en desktop además el QR. Ninguna
+// pantalla dice "ábrelo en tu celular" — eso sería un callejón sin salida para
+// quien compra desde la PC.
+//
+// NO hay botón de "Abrir Yape". Hubo uno con `yape://` y estaba muerto: era un
+// esquema supuesto, nunca verificado contra la app. Y aunque funcionara, tres
+// cosas lo condenan:
+//   · Chrome Android no abre esquemas custom desde un enlace normal; exige
+//     `intent://` con el nombre de paquete.
+//   · En iOS, si la app no declaró el esquema, Safari muestra su pantalla de
+//     error — un callejón sin salida JUSTO en el paso del cobro.
+//   · Aun abriendo, cae en la pantalla de inicio de Yape: no puede pre-llenar
+//     número ni monto, porque eso requiere el deep link de pago comercial.
+// O sea, ahorraba un cambio de app a cambio de arriesgar la venta. Copiar el
+// número funciona siempre, en los dos sistemas. Ver docs/01-SALES-ENGINE.md.
 
 import { useEffect, useState } from 'react'
-import { Check, Copy, Smartphone } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { COPY, YAPE } from '../../../lib/checkout/checkout.config'
 import type { StoreYape } from '../CheckoutModal'
 
@@ -54,29 +66,18 @@ export default function YapeBox({ yape, amount }: { yape: StoreYape | null; amou
       <p className="text-2xl font-black text-gray-900 tracking-wide leading-none">{yape.number}</p>
       <p className="text-xs text-gray-500 mt-1 mb-3">{yape.holder}</p>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={copy}
-          className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white border-2 text-xs font-black
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
-          style={{ borderColor: '#742284', color: '#742284' }}
-        >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? COPY.yapeCopied : COPY.yapeCopy}
-        </button>
-
-        {/* Solo en móvil: en desktop el esquema `yape://` no resuelve y el botón
-            llevaría a una pantalla de error. */}
-        <a
-          href={YAPE.deepLink}
-          className="sm:hidden flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-black text-white
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500"
-          style={{ background: '#742284' }}
-        >
-          <Smartphone size={14} /> {COPY.yapeOpen}
-        </a>
-      </div>
+      {/* Acción única y a todo el ancho. Antes competía con un botón muerto;
+          una acción confiable vale más que dos donde una falla. */}
+      <button
+        type="button"
+        onClick={copy}
+        className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-black text-white
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500"
+        style={{ background: '#742284' }}
+      >
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+        {copied ? COPY.yapeCopied : COPY.yapeCopy}
+      </button>
 
       {yape.qrUrl && (
         <div className="hidden sm:block mt-3">

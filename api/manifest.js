@@ -38,11 +38,13 @@ export default async function handler(req, res) {
     } catch { /* fall back to Kross */ }
   }
 
-  const icon = store.logo_url
-  const icons = icon
+  // Siempre por `/api/icon`, del MISMO origen — nunca la URL de Storage directa.
+  // Apuntar a `supabase.co` rompía el empaquetado del APK (ver api/icon.js) y
+  // ataba el manifest a dónde guardamos el branding hoy.
+  const icons = store.logo_url
     ? [
-        { src: icon, sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: icon, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        { src: '/api/icon', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/api/icon', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
       ]
     : [
         { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
@@ -50,6 +52,10 @@ export default async function handler(req, res) {
       ]
 
   const manifest = {
+    // `id` fija la identidad de la app entre versiones. Sin él, tocar
+    // `start_url` hace que Android/Chrome la traten como una app NUEVA: el
+    // usuario termina con dos íconos y la instalada deja de recibir push.
+    id: '/',
     name: store.nombre,
     short_name: store.nombre,
     description: 'Sigue tu pedido y chatea con tu asesor',

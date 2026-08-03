@@ -98,9 +98,28 @@ type MerchantCustomerSession = {
   sale:      { productId: string
                paymentMethod: 'YAPE_PLIN' | 'CONTRAENTREGA' | 'TARJETA'
                closedBy: 'AI_CLOSER' | 'DIRECT_CHECKOUT' }
+  // Adelanto por Yape (provincia). Sales lo cobra y lo cruza; Logistics decide
+  // con él si despacha. Por eso vive en el contrato y no dentro de Sales.
+  advance:   { amountPen: number            // 0 en Lima, 10 Shalom, 20 Olva
+               verification: 'NOT_REQUIRED' | 'PENDING' | 'MATCHED'
+               yapeCode?: string            // 3 dígitos tecleados por el comprador
+               voucherPath?: string         // ruta en el bucket PRIVADO `vouchers`
+               reason?: string }            // veredicto interno — NUNCA al comprador
+  stage:     'nuevo' | 'validando' | 'confirmado' | 'preparando' | 'en_camino' | 'entregado'
   loyalty:   { pointsEarned: number; nextReorderDate: Date }
 }
 ```
+
+**Tres reglas del bloque `advance` que cruzan módulos y no se negocian por pantalla:**
+
+1. **`reason` y `voucherPath` no salen del backend hacia el comprador.** `reason` es el
+   veredicto interno ("el nombre no coincide") y `voucherPath` apunta a un bucket privado.
+   `get-session` los elimina de la respuesta cuando el que mira no es vendedor. Da igual
+   que la UI no los pinte: viajan en el JSON y se ven en la pestaña de red.
+2. **El comprobante nunca se sirve como URL directa.** Se pide firmado a la Edge Function
+   `voucher-url`, que valida que el vendedor sea de la tienda dueña del pedido.
+3. **`stage` avanza solo con el cruce**, y las advertencias no lo frenan: el pago entró,
+   la duda es de operaciones. Ver `01-SALES-ENGINE.md`.
 
 Lector único: **`src/lib/session.ts` → `toCustomerSession(order, buyer)`** ensambla este
 objeto desde `order_sessions` + `buyers`. Todos los módulos leen la sesión por ahí.
@@ -115,6 +134,12 @@ Mapeo actual → objetivo:
 | `delivery.agencyName` | `order_sessions.agency_name` (columna lista, provincia pendiente) | 🟡 |
 | `sale.paymentMethod` | `order_sessions.payment_method` (def `CONTRAENTREGA`) — escrito por checkout | ✅ |
 | `sale.closedBy` | `order_sessions.closed_by` (def `DIRECT_CHECKOUT`) — escrito por checkout | ✅ |
+| `advance.amountPen` | `order_sessions.advance_amount` — lo deriva el checkout del destino | ✅ |
+| `advance.verification` | `order_sessions.payment_verification` — la cruza `yape-ingest` | ✅ |
+| `advance.yapeCode` | `order_sessions.advance_yape_code` | ✅ |
+| `advance.voucherPath` | `order_sessions.advance_voucher_url` (bucket privado) | ✅ |
+| `advance.reason` | `order_sessions.payment_reason` — solo Ventas | ✅ |
+| `stage` | `order_sessions.stage` — orden en `src/lib/order-stages.ts` | ✅ |
 | `loyalty.points` | `buyers.puntos` | ✅ |
 | `loyalty.nextReorderDate` | derivado de `restock_days` en campañas | 🟡 |
 

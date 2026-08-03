@@ -42,6 +42,16 @@ export interface MatchDecision<T> {
   /** Por qué no cuadró, o qué revisar aunque haya cuadrado. Nunca se le muestra
    *  al comprador: decirle "tu pago no existe" por un fallo nuestro es fatal. */
   reason: string | null
+  /**
+   * El código identifica el pago sin lugar a dudas, pero el MONTO no alcanza.
+   * El pedido y el pago se enlazan igual —para que Ventas los vea juntos— pero
+   * **NO se da por verificado**: falta plata, y eso lo resuelve una persona.
+   *
+   * Pasó de verdad: un comprador tecleó 195, pagó S/0.50 de los S/10 y el
+   * algoritmo filtraba por monto ANTES de mirar el código. Los dos quedaban
+   * huérfanos y nadie sabía que iban juntos.
+   */
+  shortPaid?: boolean
 }
 
 /** Dinero en céntimos: `10.1 - 10` no da 0 en punto flotante. */
@@ -57,10 +67,22 @@ export function matchPaymentToOrders(
   const amount = cents(payment.amount_pen)
   const sameAmount = orders.filter(o => cents(o.advance_amount) === amount)
 
+  // El código se busca en TODOS los pedidos, no solo en los del mismo monto: es
+  // la evidencia más fuerte que existe —el comprador lo tecleó ANTES de pagar—
+  // y filtrar por monto primero la desperdiciaba.
   const byCode = code(payment.security_code)
-    ? sameAmount.find(o => code(o.advance_yape_code) === code(payment.security_code))
+    ? orders.find(o => code(o.advance_yape_code) === code(payment.security_code))
     : undefined
-  if (byCode) return { chosen: byCode, reason: nameWarning(payment.sender_name, byCode.buyer_name) }
+  if (byCode) {
+    const short = cents(byCode.advance_amount) !== amount
+    return {
+      chosen: byCode,
+      shortPaid: short || undefined,
+      reason: short
+        ? `Pagó S/${money(payment.amount_pen)} de los S/${money(byCode.advance_amount)} esperados (código ${code(payment.security_code)}). Falta cobrar la diferencia.`
+        : nameWarning(payment.sender_name, byCode.buyer_name),
+    }
+  }
 
   if (sameAmount.length === 1) {
     const only = sameAmount[0]
@@ -84,10 +106,20 @@ export function matchOrderToPayments(
   const amount = cents(order.advance_amount)
   const sameAmount = payments.filter(p => cents(p.amount_pen) === amount)
 
+  // Igual que en el otro sentido: el código manda sobre el monto.
   const byCode = code(order.advance_yape_code)
-    ? sameAmount.find(p => code(p.security_code) === code(order.advance_yape_code))
+    ? payments.find(p => code(p.security_code) === code(order.advance_yape_code))
     : undefined
-  if (byCode) return { chosen: byCode, reason: nameWarning(byCode.sender_name, order.buyer_name) }
+  if (byCode) {
+    const short = cents(byCode.amount_pen) !== amount
+    return {
+      chosen: byCode,
+      shortPaid: short || undefined,
+      reason: short
+        ? `Pagó S/${money(byCode.amount_pen)} de los S/${money(order.advance_amount)} esperados (código ${code(order.advance_yape_code)}). Falta cobrar la diferencia.`
+        : nameWarning(byCode.sender_name, order.buyer_name),
+    }
+  }
 
   if (sameAmount.length === 1) {
     const only = sameAmount[0]

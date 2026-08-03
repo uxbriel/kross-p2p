@@ -107,8 +107,13 @@ export async function uploadVoucher(file: File, orderId: string): Promise<string
 
   const small = await downscaleImage(file, IMAGE_PRESETS.voucher)
   const path = `${orderId}/${Date.now()}.jpg`
+  // Sin `upsert`: la ruta ya es única (orderId + timestamp), así que nunca hay
+  // nada que reemplazar. Pedirlo obliga a Storage a resolver el camino de
+  // UPDATE, y el bucket `vouchers` solo tiene política de INSERT — de ahí el
+  // "violates row-level security policy" que veía el comprador al adjuntar. Es
+  // el MISMO fallo que ya se corrigió en las fotos de producto.
   const { error } = await supabase.storage
-    .from(VOUCHER.bucket).upload(path, small, { contentType: small.type, upsert: true })
+    .from(VOUCHER.bucket).upload(path, small, { contentType: small.type })
   if (error) throw new Error(error.message)
   return path
 }

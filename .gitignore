@@ -32,3 +32,9 @@ dist/
 
 # Basura temporal de la CLI de Supabase
 supabase/.temp/
+
+# Firma del APK Android — perder esto = no poder actualizar la app NUNCA.
+# Nunca al repo. Ver docs/04-APK-ANDROID.md
+*.keystore
+*.jks
+android/keystore*

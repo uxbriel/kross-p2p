@@ -4,6 +4,7 @@ import { Send, Phone, PhoneOff, Mic, MicOff, Package, ArrowLeft, CheckCircle2, B
 import { supabase } from '../../lib/supabase'
 import IncomingCallOverlay from '../../components/IncomingCallOverlay'
 import AddressBar from '../../components/AddressBar'
+import AdvancePanel from '../../components/checkout/payment/AdvancePanel'
 import OrderDetailModal from '../../components/OrderDetailModal'
 import OfferCard from '../../components/OfferCard'
 import { sendCallCancel, listenCallReject } from '../../lib/call-signal'
@@ -14,7 +15,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-const STAGES = ['nuevo','confirmado','preparando','en_camino','entregado']
+// Ventas SÍ ve `validando` siempre: necesita distinguir un pedido que espera
+// cruce de uno recién creado, aunque el comprador de Lima nunca pase por ahí.
+const STAGES = ['nuevo','validando','confirmado','preparando','en_camino','entregado']
 
 // ─── Seller-initiated call modal ──────────────────────────────────────────────
 type CallState = 'connecting' | 'connected' | 'ended' | 'error'
@@ -223,7 +226,7 @@ function StageSelector({ current, sessionId, canWrite, onAdvanced }: {
 }) {
   const [busy, setBusy] = useState(false)
   const stageLabel: Record<string, string> = {
-    nuevo: 'Nuevo', confirmado: 'Confirmado', preparando: 'Preparando', en_camino: 'En camino', entregado: 'Entregado'
+    nuevo: 'Nuevo', validando: 'Validando', confirmado: 'Confirmado', preparando: 'Preparando', en_camino: 'En camino', entregado: 'Entregado'
   }
 
   const advance = async () => {
@@ -669,6 +672,18 @@ export default function VendedorPedidoPage() {
       )}
 
       {/* Dirección de entrega */}
+      {/* Antes que la dirección: si el adelanto no cuadró, eso decide si se
+          despacha o no — la dirección recién importa después. */}
+      <AdvancePanel
+        sessionId={session.id}
+        sellerAuthId={effective?.auth_user_id ?? null}
+        advanceAmount={Number(session.advance_amount ?? 0)}
+        verification={session.payment_verification ?? null}
+        reason={session.payment_reason ?? null}
+        yapeCode={session.advance_yape_code ?? null}
+        hasVoucher={!!session.advance_voucher_url}
+      />
+
       <AddressBar
         sessionId={session.id}
         address={session.address ?? null}

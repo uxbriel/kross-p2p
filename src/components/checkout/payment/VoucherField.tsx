@@ -50,11 +50,14 @@ export default function VoucherField({ voucher, onSelect, error }: VoucherFieldP
         {busy ? 'Subiendo…' : voucher ? `${COPY.voucherAttached} · ${COPY.voucherReplace}` : COPY.voucherOptional}
         {VOUCHER_REQUIRED && <span aria-hidden="true">*</span>}
       </button>
+      {/* SIN `capture`: forzaba la cámara trasera, y el comprobante ya es una
+          CAPTURA DE PANTALLA que vive en la galería. Abrirle la cámara lo dejaba
+          enfocando la nada y teniendo que salir a buscar la galería a mano — o
+          peor, fotografiando la pantalla de otro teléfono. */}
       <input
         ref={inputRef}
         type="file"
         accept={VOUCHER.accept}
-        capture="environment"
         className="hidden"
         onChange={pick}
         aria-label={COPY.voucherOptional}

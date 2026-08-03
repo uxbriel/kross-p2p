@@ -261,7 +261,13 @@ Deno.serve(async (req) => {
       pack_name: body.pack_name ?? null,
       items: [{ product_id: body.product_id ?? null, nombre: body.product_name, precio: finalPrice, unit_price: finalPrice, qty: 1, pack_name: body.pack_name ?? null, image: firstImage }],
       status: 'active',
-      stage: 'nuevo',
+      // Con adelanto arranca en `validando`: el comprador acaba de pagar y su
+      // barra TIENE que moverse, o el siguiente paso que da es escribir
+      // "¿llegó mi pago?" —el mensaje que este checkout existe para evitar—.
+      // Sin adelanto (Lima, contraentrega puro) no hay nada que validar y el
+      // pedido nace confirmado: mostrarle un paso pendiente que nunca va a
+      // ocurrir se lee como que algo se atascó.
+      stage: advanceAmount > 0 ? 'validando' : 'confirmado',
       // Costuras del estado central — el checkout las deja escritas desde el día 1
       payment_method: ['YAPE_PLIN', 'CONTRAENTREGA', 'TARJETA'].includes(body.payment_method ?? '') ? body.payment_method : 'CONTRAENTREGA',
       closed_by: body.closed_by === 'AI_CLOSER' ? 'AI_CLOSER' : 'DIRECT_CHECKOUT',
@@ -328,7 +334,7 @@ Deno.serve(async (req) => {
       .gte('received_at', since)
       .order('received_at', { ascending: false })
 
-    const { chosen, reason } = matchOrderToPayments(
+    const { chosen, reason, shortPaid } = matchOrderToPayments(
       {
         id: data.id, order_id: orderId, buyer_name: body.buyer_name,
         advance_amount: advanceAmount, advance_yape_code: advanceYapeCode,
@@ -338,13 +344,19 @@ Deno.serve(async (req) => {
 
     if (chosen) {
       const matchedAt = new Date().toISOString()
-      const { data: st } = await supabase
-        .from('stores').select('yape_autoconfirm').eq('id', body.store_id).maybeSingle()
       const patch: Record<string, unknown> = {
-        payment_verification: 'MATCHED', payment_matched_at: matchedAt,
+        // Monto incompleto: se enlaza para que Ventas lo vea, pero no se da
+        // por verificado — falta plata.
+        payment_verification: shortPaid ? 'PENDING' : 'MATCHED', payment_matched_at: matchedAt,
         payment_reason: reason, payment_event_id: chosen.id,
       }
-      if (st?.yape_autoconfirm === true) patch.stage = 'confirmado'
+      // Un cruce confirmado mueve el pedido, sin flag de por medio: para el
+      // comprador el pago YA ocurrió, y dejarlo en "validando" mientras el
+      // dinero está cobrado es la contradicción que genera el reclamo.
+      // Las advertencias (nombre distinto, código que no calza) NO frenan esto
+      // — quedan en `payment_reason` y en el mensaje interno para que Ventas las
+      // revise antes de despachar, que es el momento donde importan.
+      if (!shortPaid) patch.stage = 'confirmado'
 
       await supabase.from('order_sessions').update(patch).eq('id', data.id)
       await supabase.from('payment_events')
@@ -355,12 +367,15 @@ Deno.serve(async (req) => {
       await supabase.from('chat_messages').insert({
         session_id: data.id, sender_role: 'system', sender_name: 'Kross', type: 'text',
         visibility: 'sellers',
-        body: `✅ Adelanto de S/${advanceAmount} verificado automáticamente`
+        body: (shortPaid
+          ? `⚠️ Pago identificado pero INCOMPLETO — S/${advanceAmount} esperados`
+          : `✅ Adelanto de S/${advanceAmount} verificado automáticamente`)
           + (chosen.sender_name ? ` · pagó ${chosen.sender_name}` : '')
           + (reason ? `\n⚠️ ${reason}` : ''),
       })
-      // Y el acuse para el comprador: su plata llegó y este es el canal.
-      await supabase.from('chat_messages').insert({
+      // El acuse al comprador SOLO si entró completo: decirle "recibimos tu
+      // adelanto" cuando pagó de menos lo deja creyendo que ya está.
+      if (!shortPaid) await supabase.from('chat_messages').insert({
         session_id: data.id, sender_role: 'system', sender_name: 'Kross',
         type: 'status_update', visibility: 'all',
         body: `✅ ¡Recibimos tu adelanto de S/${advanceAmount}! Ya estamos preparando tu pedido.`

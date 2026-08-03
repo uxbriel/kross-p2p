@@ -123,3 +123,43 @@ export function purgeExpiredDrafts(): void {
     // ignorar
   }
 }
+
+// ─── Último pedido cerrado ───────────────────────────────────────────────────
+// Al cerrar la ventana de confirmación, el comprador se queda en la landing sin
+// ninguna vía de volver a su pedido: el token vivía solo en memoria del modal y
+// se perdía. Feedback real de compradores. Guardarlo permite que la landing
+// ofrezca "Ver mi pedido" mientras el pedido está fresco.
+const LAST_ORDER_KEY = 'kross_last_order'
+/** Se ofrece por 3 días: pasado ese plazo la entrega ya ocurrió o el chat dejó
+ *  de ser lo relevante, y un botón viejo en la landing solo confunde. */
+const LAST_ORDER_TTL_MS = 3 * 24 * 60 * 60 * 1000
+
+export interface LastOrder {
+  token: string
+  orderCode: string
+  productId: string | null
+  savedAt: number
+}
+
+export function saveLastOrder(token: string, orderCode: string, productId: string | null): void {
+  try {
+    localStorage.setItem(LAST_ORDER_KEY, JSON.stringify({
+      token, orderCode, productId, savedAt: Date.now(),
+    } satisfies LastOrder))
+  } catch { /* modo incógnito o storage lleno: perder esto no rompe nada */ }
+}
+
+export function loadLastOrder(): LastOrder | null {
+  try {
+    const raw = localStorage.getItem(LAST_ORDER_KEY)
+    if (!raw) return null
+    const o = JSON.parse(raw) as LastOrder
+    if (!o?.token || Date.now() - o.savedAt > LAST_ORDER_TTL_MS) {
+      localStorage.removeItem(LAST_ORDER_KEY)
+      return null
+    }
+    return o
+  } catch {
+    return null
+  }
+}

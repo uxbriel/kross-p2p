@@ -1,3 +1,4 @@
+import type { OrderStage } from './order-stages'
 const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
@@ -12,7 +13,7 @@ export interface OrderSession {
   product_price: number | null
   pack_name: string | null
   status: 'active' | 'delivered' | 'rejected' | 'expired' | 'cancelado'
-  stage: 'nuevo' | 'confirmado' | 'preparando' | 'en_camino' | 'entregado'
+  stage: OrderStage
   expires_at: string | null
   seller_name: string | null
   seller_role: string | null
@@ -29,6 +30,12 @@ export interface OrderSession {
   delivery_reference?: string | null
   /** Estado del cruce del adelanto por Yape. */
   payment_verification?: string | null
+  /** Motivo escrito por el cruce: nombre distinto, código que no calza, etc. */
+  payment_reason?: string | null
+  /** Ruta en el bucket privado `vouchers`. NUNCA es una URL abrible: se pide
+   *  firmada a la función `voucher-url` en el momento de mirarla. */
+  advance_voucher_url?: string | null
+  advance_yape_code?: string | null
   advance_amount?: number | string | null
   items?: OrderItem[] | null
   buyer_can_call?: boolean

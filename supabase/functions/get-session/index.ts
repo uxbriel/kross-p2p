@@ -30,7 +30,8 @@ Deno.serve(async (req) => {
       involved_seller_ids, writer_seller_ids, invited_seller_ids, invited_by,
       address, address_verified, address_lat, address_lng, nota,
       dispatch_type, agency_name, delivery_reference,
-      payment_verification, advance_amount,
+      payment_verification, payment_reason, advance_voucher_url,
+      advance_yape_code, advance_amount,
       expires_at, created_at
     `)
     .eq('token', token)
@@ -118,9 +119,23 @@ Deno.serve(async (req) => {
   if (!viewerIsSeller) mq = mq.or('visibility.is.null,visibility.eq.all')
   const { data: messages } = await mq
 
+  // Campos SOLO de Ventas. `payment_reason` es el veredicto interno del cruce
+  // ("el nombre no coincide", "el código no calza") y `advance_voucher_url` es
+  // la ruta del comprobante en el bucket privado. Mandárselos al comprador
+  // repetiría la fuga que ya se corrigió en los mensajes del chat: da igual que
+  // la UI no los pinte, viajan en la respuesta y quedan a la vista de cualquiera
+  // que mire la red.
+  const sellerOnly = viewerIsSeller
+    ? {}
+    : { payment_reason: undefined, advance_voucher_url: undefined }
+
   return new Response(
     JSON.stringify({
-      session: { ...session, seller_name: sellerName, seller_role: sellerRole, seller_avatar: sellerAvatar, participants, buyer_can_call: buyerCanCall },
+      session: {
+        ...session, ...sellerOnly,
+        seller_name: sellerName, seller_role: sellerRole, seller_avatar: sellerAvatar,
+        participants, buyer_can_call: buyerCanCall,
+      },
       viewer_is_seller: viewerIsSeller,
       messages: messages ?? [],
     }),
